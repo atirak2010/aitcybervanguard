@@ -117,7 +117,7 @@ export function mapXdrEndpoint(xdr: XdrEndpoint): Endpoint {
     name: xdr.endpoint_name || xdr.alias || "Unknown",
     type: mapEndpointType(xdr),
     status: mapEndpointStatus(xdr.endpoint_status),
-    os: xdr.os_type || "Unknown",
+    os: (xdr.operating_system as string) || xdr.os_type || "Unknown",
     agentVersion: xdr.endpoint_version || "—",
     ip: ips[0] || xdr.public_ip || "—",
     username: (xdr.users || []).join(", ") || "—",
