@@ -7,10 +7,12 @@ export function useSyncStatus() {
   const queryClient = useQueryClient();
   const [incidentSync, setIncidentSync] = useState<SyncMeta | null>(null);
   const [endpointSync, setEndpointSync] = useState<SyncMeta | null>(null);
+  const [alertSync, setAlertSync] = useState<SyncMeta | null>(null);
 
   useEffect(() => {
     getSyncMeta("incidents").then((m) => m && setIncidentSync(m));
     getSyncMeta("endpoints").then((m) => m && setEndpointSync(m));
+    getSyncMeta("alerts").then((m) => m && setAlertSync(m));
 
     const unsubscribe = onSyncChange((meta) => {
       if (meta.key === "incidents") {
@@ -25,10 +27,16 @@ export function useSyncStatus() {
           queryClient.invalidateQueries({ queryKey: ["endpoints"] });
         }
       }
+      if (meta.key === "alerts") {
+        setAlertSync(meta);
+        if (meta.status === "idle") {
+          queryClient.invalidateQueries({ queryKey: ["alerts"] });
+        }
+      }
     });
 
     return unsubscribe;
   }, [queryClient]);
 
-  return { incidentSync, endpointSync };
+  return { incidentSync, endpointSync, alertSync };
 }

@@ -1,4 +1,4 @@
-import { LayoutDashboard, AlertTriangle, Monitor, FileText, Settings } from "lucide-react";
+import { LayoutDashboard, AlertTriangle, Bell, Monitor, BarChart3, FileText, Settings, Users } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -18,11 +18,14 @@ import { Shield } from "lucide-react";
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Incidents", url: "/incidents", icon: AlertTriangle },
+  { title: "Alerts", url: "/alerts", icon: Bell },
   { title: "Endpoints", url: "/endpoints", icon: Monitor },
 ];
 
 const restrictedItems = [
+  { title: "Reports", url: "/reports", icon: BarChart3, requiredRole: ["manager", "admin"] as string[] },
   { title: "Audit Log", url: "/audit-log", icon: FileText, requiredRole: ["manager", "admin"] as string[] },
+  { title: "User Management", url: "/users", icon: Users, requiredRole: ["admin"] as string[] },
   { title: "Settings", url: "/settings", icon: Settings, requiredRole: ["admin"] as string[] },
 ];
 
@@ -77,7 +80,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t px-4 py-3">
-        <p className="text-xs text-muted-foreground">v1.0 — Mock Mode</p>
+        <p className="text-xs text-muted-foreground">v2.0 — Cortex XDR</p>
       </SidebarFooter>
     </Sidebar>
   );

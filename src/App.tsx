@@ -16,7 +16,10 @@ import IncidentsPage from "@/pages/IncidentsPage";
 import IncidentDetailPage from "@/pages/IncidentDetailPage";
 import EndpointsPage from "@/pages/EndpointsPage";
 import AuditLogPage from "@/pages/AuditLogPage";
+import AlertsPage from "@/pages/AlertsPage";
+import ReportsPage from "@/pages/ReportsPage";
 import SettingsPage from "@/pages/SettingsPage";
+import UserManagementPage from "@/pages/UserManagementPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -38,14 +41,17 @@ function SyncBootstrap({ children }: { children: React.ReactNode }) {
 }
 
 function ProtectedRoute({ children, requiredPermission }: { children: React.ReactNode; requiredPermission?: string }) {
-  const { user, hasPermission } = useAuth();
+  const { user, loading, hasPermission } = useAuth();
+  if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
   if (requiredPermission && !hasPermission(requiredPermission as any)) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 
 function AuthRouter() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  if (loading) return null;
 
   return (
     <Routes>
@@ -55,9 +61,12 @@ function AuthRouter() {
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="incidents" element={<IncidentsPage />} />
         <Route path="incidents/:id" element={<IncidentDetailPage />} />
+        <Route path="alerts" element={<AlertsPage />} />
         <Route path="endpoints" element={<EndpointsPage />} />
+        <Route path="reports" element={<ProtectedRoute requiredPermission="viewAuditLog"><ReportsPage /></ProtectedRoute>} />
         <Route path="audit-log" element={<ProtectedRoute requiredPermission="viewAuditLog"><AuditLogPage /></ProtectedRoute>} />
-        <Route path="settings" element={<ProtectedRoute requiredPermission="viewAuditLog"><SettingsPage /></ProtectedRoute>} />
+        <Route path="settings" element={<ProtectedRoute requiredPermission="advancedEndpointActions"><SettingsPage /></ProtectedRoute>} />
+        <Route path="users" element={<ProtectedRoute requiredPermission="advancedEndpointActions"><UserManagementPage /></ProtectedRoute>} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

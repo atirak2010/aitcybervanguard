@@ -12,4 +12,17 @@ export interface Endpoint {
   username: string;
   lastSeen: string;
   relatedIncidentIds?: string[];
+  // Health fields
+  contentStatus?: string;
+  operationalStatus?: string;
+  scanStatus?: string;
+  assignedPolicy?: string;
+  groupName?: string[];
+  firstSeen?: string;
+  installDate?: string;
+  macAddress?: string[];
+  // Network / identity fields
+  domain?: string;
+  publicIp?: string;
+  isIsolated?: boolean;
 }

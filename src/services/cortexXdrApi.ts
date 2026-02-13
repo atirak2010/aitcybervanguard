@@ -229,6 +229,71 @@ export async function getAlerts(
   };
 }
 
+// --- Incident Extra Data (alerts with artifacts) --------------------
+
+export interface XdrAlertDetail {
+  alert_id: string;
+  name: string;
+  severity: string;
+  category: string;
+  description: string;
+  host_ip: string;
+  host_name: string;
+  source: string;
+  action: string;
+  action_pretty: string;
+  detection_timestamp: number;
+  // Process / file artifact fields
+  action_file_path: string | null;
+  action_file_sha256: string | null;
+  action_process_image_name: string | null;
+  action_process_image_sha256: string | null;
+  action_process_command_line: string | null;
+  actor_process_image_name: string | null;
+  actor_process_image_sha256: string | null;
+  actor_process_command_line: string | null;
+  causality_actor_process_image_name: string | null;
+  causality_actor_process_image_sha256: string | null;
+  causality_actor_process_command_line: string | null;
+  // Network fields
+  action_local_ip: string | null;
+  action_remote_ip: string | null;
+  action_remote_port: number | null;
+  dns_query_name: string | null;
+  // File fields
+  action_file_name: string | null;
+  action_file_md5: string | null;
+  // Registry
+  action_registry_key_name: string | null;
+  action_registry_value_name: string | null;
+  // User
+  actor_effective_username: string | null;
+  [key: string]: unknown;
+}
+
+export interface XdrIncidentExtraData {
+  incident: XdrIncident;
+  alerts: {
+    total_count: number;
+    data: XdrAlertDetail[];
+  };
+}
+
+export async function getIncidentExtraData(
+  incidentId: string,
+): Promise<XdrIncidentExtraData> {
+  const body = {
+    request_data: {
+      incident_id: incidentId,
+      alerts_limit: 50,
+    },
+  };
+  const data = await xdrFetch<{
+    reply: XdrIncidentExtraData;
+  }>("/public_api/v1/incidents/get_incident_extra_data/", body);
+  return data.reply;
+}
+
 // --- Connection Test ------------------------------------------------
 
 export interface ConnectionTestResult {

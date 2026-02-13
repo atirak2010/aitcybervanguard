@@ -1,12 +1,14 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useIncidents } from "@/hooks/useIncidents";
 import { useEndpoints } from "@/hooks/useEndpoints";
+import { useAlerts } from "@/hooks/useAlerts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SeverityBadge } from "@/components/StatusBadges";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend } from "recharts";
-import { AlertTriangle, ShieldAlert, ShieldCheck, Activity, Loader2 } from "lucide-react";
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend, LineChart, Line } from "recharts";
+import { AlertTriangle, ShieldAlert, ShieldCheck, Activity, Loader2, Monitor, Wifi, WifiOff, Bell } from "lucide-react";
 import AttackVectorsChart from "@/components/dashboard/AttackVectorsChart";
 import ActiveIncidentsTable from "@/components/dashboard/ActiveIncidentsTable";
 import { getFlagUrl, getCountryName } from "@/lib/utils";
@@ -22,10 +24,12 @@ const SEVERITY_COLORS = {
 type TimeFilter = "24h" | "7d" | "30d";
 
 export default function DashboardPage() {
+  const navigate = useNavigate();
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("7d");
   const { data: incidents = [], isLoading: incidentsLoading } = useIncidents();
   const { data: endpoints = [], isLoading: endpointsLoading } = useEndpoints();
-  const loading = incidentsLoading || endpointsLoading;
+  const { data: alerts = [], isLoading: alertsLoading } = useAlerts();
+  const loading = incidentsLoading || endpointsLoading || alertsLoading;
 
   const filteredIncidents = useMemo(() => {
     const now = new Date();
@@ -79,6 +83,39 @@ export default function DashboardPage() {
         return { target, name: endpoint?.name || target, ip: endpoint?.ip || "—", count };
       });
   }, [filteredIncidents, endpoints]);
+
+  // Endpoint status counts
+  const endpointStats = useMemo(() => ({
+    connected: endpoints.filter((e) => e.status === "connected").length,
+    disconnected: endpoints.filter((e) => e.status === "disconnected").length,
+    lost: endpoints.filter((e) => e.status === "lost").length,
+    total: endpoints.length,
+  }), [endpoints]);
+
+  // Recent 5 alerts
+  const recentAlerts = useMemo(() => alerts.slice(0, 5), [alerts]);
+
+  // Alert trend (7 days) — use Bangkok timezone for consistency with incident dates
+  const alertTrend = useMemo(() => {
+    const now = new Date();
+    const days: Record<string, Record<string, number>> = {};
+    // Prepare last 7 day buckets in Bangkok timezone
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const key = d.toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+      days[key] = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+    }
+    alerts.forEach((a) => {
+      const dateKey = new Date(a.timestamp).toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+      if (days[dateKey]) {
+        days[dateKey][a.severity] = (days[dateKey][a.severity] || 0) + 1;
+      }
+    });
+    return Object.entries(days)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, counts]) => ({ date: date.slice(5), ...counts }));
+  }, [alerts]);
 
   if (loading) {
     return (
@@ -157,6 +194,54 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      {/* Endpoint Status Row */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <Card className="cursor-pointer transition-shadow hover:shadow-md" onClick={() => navigate("/endpoints?status=connected")}>
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-online/10">
+              <Wifi className="h-5 w-5 text-status-online" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Connected</p>
+              <p className="text-xl font-bold text-status-online">{endpointStats.connected}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="cursor-pointer transition-shadow hover:shadow-md" onClick={() => navigate("/endpoints?status=disconnected")}>
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-offline/10">
+              <WifiOff className="h-5 w-5 text-status-offline" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Disconnected</p>
+              <p className="text-xl font-bold">{endpointStats.disconnected}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="cursor-pointer transition-shadow hover:shadow-md" onClick={() => navigate("/endpoints?status=lost")}>
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-severity-medium/10">
+              <AlertTriangle className="h-5 w-5 text-severity-medium" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Connection Lost</p>
+              <p className="text-xl font-bold text-severity-medium">{endpointStats.lost}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="cursor-pointer transition-shadow hover:shadow-md" onClick={() => navigate("/endpoints")}>
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+              <Monitor className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Total Endpoints</p>
+              <p className="text-xl font-bold">{endpointStats.total}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Charts Row */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
@@ -197,6 +282,64 @@ export default function DashboardPage() {
 
       {/* Active Incidents Table */}
       <ActiveIncidentsTable incidents={filteredIncidents} />
+
+      {/* Alert Trend + Recent Alerts */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader><CardTitle className="text-base">Alert Trend (7 Days)</CardTitle></CardHeader>
+          <CardContent>
+            {alertTrend.length > 0 ? (
+              <ResponsiveContainer width="100%" height={250}>
+                <LineChart data={alertTrend}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" fontSize={11} />
+                  <YAxis allowDecimals={false} fontSize={11} />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="critical" stroke={SEVERITY_COLORS.critical} strokeWidth={2} dot={false} name="Critical" />
+                  <Line type="monotone" dataKey="high" stroke={SEVERITY_COLORS.high} strokeWidth={2} dot={false} name="High" />
+                  <Line type="monotone" dataKey="medium" stroke={SEVERITY_COLORS.medium} strokeWidth={2} dot={false} name="Medium" />
+                  <Line type="monotone" dataKey="low" stroke={SEVERITY_COLORS.low} strokeWidth={1.5} dot={false} name="Low" />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="py-8 text-center text-sm text-muted-foreground">No alert data</p>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Bell className="h-4 w-4" /> Recent Alerts</CardTitle></CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Alert</TableHead>
+                  <TableHead>Severity</TableHead>
+                  <TableHead>Host</TableHead>
+                  <TableHead>Action</TableHead>
+                  <TableHead>Time</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {recentAlerts.map((a) => (
+                  <TableRow key={a.id}>
+                    <TableCell className="max-w-[180px] truncate text-xs font-medium">{a.name}</TableCell>
+                    <TableCell><SeverityBadge severity={a.severity} /></TableCell>
+                    <TableCell className="font-mono text-xs">{a.hostName}</TableCell>
+                    <TableCell className="text-xs">{a.actionPretty}</TableCell>
+                    <TableCell className="text-xs whitespace-nowrap">
+                      {new Date(a.timestamp).toLocaleString("th-TH", { timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {recentAlerts.length === 0 && (
+                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No alerts</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Tables Row */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

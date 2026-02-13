@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useIncidentById } from "@/hooks/useIncidents";
+import { useIncidentById, useIncidentExtraData } from "@/hooks/useIncidents";
 import { ArtifactType } from "@/types/incidents";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAudit } from "@/contexts/AuditContext";
@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Shield, Skull, FileX, Ban, CheckCircle, FileText, Globe, Link, Hash, Mail, Database, Monitor, Server, Laptop, Network, Loader2 } from "lucide-react";
+import { ArrowLeft, Shield, Skull, FileX, Ban, CheckCircle, FileText, Globe, Link, Hash, Mail, Database, Monitor, Server, Laptop, Network, Loader2, Star, ExternalLink } from "lucide-react";
 import { formatDateTime, getFlagUrl, getCountryName } from "@/lib/utils";
 
 const ARTIFACT_ICON: Record<ArtifactType, typeof FileText> = {
@@ -47,9 +47,14 @@ export default function IncidentDetailPage() {
   const { addAuditEntry } = useAudit();
 
   const { data: incident, isLoading: loading } = useIncidentById(id);
+  const { data: extraData, isLoading: extraLoading } = useIncidentExtraData(id);
   const [actionComment, setActionComment] = useState("");
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Merge extra data (artifacts + alerts) from XDR API with base incident
+  const artifacts = extraData?.artifacts?.length ? extraData.artifacts : incident?.artifacts;
+  const alertDetails = extraData?.alerts?.length ? extraData.alerts : incident?.alerts;
 
   if (loading) {
     return (
@@ -104,11 +109,11 @@ export default function IncidentDetailPage() {
           </Card>
 
           {/* Alert Summary */}
-          {incident.alerts && incident.alerts.length > 0 && (
+          {alertDetails && alertDetails.length > 0 ? (
             <Card>
-              <CardHeader><CardTitle className="text-base">Alert Summary ({incident.alerts.length})</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-base">Alert Details ({alertDetails.length})</CardTitle></CardHeader>
               <CardContent className="space-y-2">
-                {incident.alerts.map((a) => (
+                {alertDetails.map((a) => (
                   <div key={a.id} className="flex items-center justify-between rounded-md border p-3">
                     <div className="flex items-center gap-3">
                       <SeverityBadge severity={a.severity} />
@@ -119,7 +124,14 @@ export default function IncidentDetailPage() {
                 ))}
               </CardContent>
             </Card>
-          )}
+          ) : extraLoading ? (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Alert Details</CardTitle></CardHeader>
+              <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading alert details from Cortex XDR...
+              </CardContent>
+            </Card>
+          ) : null}
 
           {/* Timeline */}
           {incident.timeline && incident.timeline.length > 0 && (
@@ -140,9 +152,9 @@ export default function IncidentDetailPage() {
           )}
 
           {/* Artifacts */}
-          {incident.artifacts && incident.artifacts.length > 0 && (
+          {artifacts && artifacts.length > 0 ? (
             <Card>
-              <CardHeader><CardTitle className="text-base">Artifacts ({incident.artifacts.length})</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-base">Artifacts ({artifacts.length})</CardTitle></CardHeader>
               <CardContent className="p-0">
                 <Table>
                   <TableHeader>
@@ -154,7 +166,7 @@ export default function IncidentDetailPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {incident.artifacts.map((art) => {
+                    {artifacts.map((art) => {
                       const Icon = ARTIFACT_ICON[art.type] || FileText;
                       const flagUrl = art.type === "ip" ? getFlagUrl(art.value) : null;
                       const country = art.type === "ip" ? getCountryName(art.value) : "";
@@ -183,7 +195,14 @@ export default function IncidentDetailPage() {
                 </Table>
               </CardContent>
             </Card>
-          )}
+          ) : extraLoading ? (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Artifacts</CardTitle></CardHeader>
+              <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading artifacts from Cortex XDR...
+              </CardContent>
+            </Card>
+          ) : null}
 
           {/* Assets */}
           {incident.assets && incident.assets.length > 0 && (
@@ -235,11 +254,45 @@ export default function IncidentDetailPage() {
           <Card>
             <CardHeader><CardTitle className="text-base">Details</CardTitle></CardHeader>
             <CardContent className="space-y-3 text-sm">
+              {incident.starred && (
+                <div className="flex items-center gap-1.5 text-amber-500"><Star className="h-3.5 w-3.5 fill-amber-400" /> Starred Incident</div>
+              )}
               <div className="flex justify-between"><span className="text-muted-foreground">Source</span><span className="font-mono">{incident.source}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Destination</span><span className="font-mono">{incident.destination}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Date</span><span>{incident.date}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Time</span><span>{incident.time}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Alerts</span><span>{incident.alertCount}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Alerts</span>
+                <span>
+                  {incident.alertCount}
+                  {(incident.highSeverityAlertCount ?? 0) > 0 && (
+                    <span className="ml-1 text-xs text-severity-high">({incident.highSeverityAlertCount} high)</span>
+                  )}
+                </span>
+              </div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Hosts</span><span>{incident.hostCount ?? "—"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Users</span><span>{incident.userCount ?? "—"}</span></div>
+              {incident.score != null && (
+                <div className="flex justify-between"><span className="text-muted-foreground">Risk Score</span>
+                  <Badge variant={incident.score >= 70 ? "destructive" : incident.score >= 40 ? "default" : "secondary"} className="text-xs">{incident.score}</Badge>
+                </div>
+              )}
+              {incident.assignedTo && (
+                <div className="flex justify-between gap-2"><span className="text-muted-foreground shrink-0">Assigned To</span><span className="text-right text-xs">{incident.assignedTo}</span></div>
+              )}
+              {incident.modifiedTime && (
+                <div className="flex justify-between"><span className="text-muted-foreground">Last Updated</span><span className="text-xs">{formatDateTime(incident.modifiedTime)}</span></div>
+              )}
+              {incident.notes && (
+                <div className="pt-1 border-t">
+                  <p className="text-xs text-muted-foreground mb-1">Notes</p>
+                  <p className="text-xs">{incident.notes}</p>
+                </div>
+              )}
+              {incident.xdrUrl && (
+                <Button variant="outline" size="sm" className="w-full mt-2" onClick={() => window.open(incident.xdrUrl, "_blank")}>
+                  <ExternalLink className="mr-2 h-3.5 w-3.5" /> Open in Cortex XDR
+                </Button>
+              )}
             </CardContent>
           </Card>
 

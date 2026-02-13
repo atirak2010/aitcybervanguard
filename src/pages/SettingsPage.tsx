@@ -29,8 +29,8 @@ export default function SettingsPage() {
   const [xdrIncidents, setXdrIncidents] = useState<XdrIncident[] | null>(null);
   const [incidentError, setIncidentError] = useState<string | null>(null);
 
-  const { incidentSync, endpointSync } = useSyncStatus();
-  const isSyncing = incidentSync?.status === "syncing" || endpointSync?.status === "syncing";
+  const { incidentSync, endpointSync, alertSync } = useSyncStatus();
+  const isSyncing = incidentSync?.status === "syncing" || endpointSync?.status === "syncing" || alertSync?.status === "syncing";
 
   const [loadingEndpoints, setLoadingEndpoints] = useState(false);
   const [xdrEndpoints, setXdrEndpoints] = useState<XdrEndpoint[] | null>(null);
@@ -249,7 +249,7 @@ export default function SettingsPage() {
           <CardDescription>Data is synced from Cortex XDR to a local browser database for fast access</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-5">
             <div>
               <p className="text-xs text-muted-foreground">Cached Incidents</p>
               <p className="text-lg font-bold">{incidentSync?.syncedCount ?? 0}</p>
@@ -257,6 +257,10 @@ export default function SettingsPage() {
             <div>
               <p className="text-xs text-muted-foreground">Cached Endpoints</p>
               <p className="text-lg font-bold">{endpointSync?.syncedCount ?? 0}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Cached Alerts</p>
+              <p className="text-lg font-bold">{alertSync?.syncedCount ?? 0}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Last Synced</p>
@@ -270,16 +274,16 @@ export default function SettingsPage() {
               <p className="text-xs text-muted-foreground">Status</p>
               <Badge variant={
                 isSyncing ? "default" :
-                incidentSync?.status === "error" ? "destructive" : "secondary"
+                (incidentSync?.status === "error" || endpointSync?.status === "error" || alertSync?.status === "error") ? "destructive" : "secondary"
               }>
                 {isSyncing ? "Syncing..." :
-                 incidentSync?.status === "error" ? "Error" : "Ready"}
+                 (incidentSync?.status === "error" || endpointSync?.status === "error" || alertSync?.status === "error") ? "Error" : "Ready"}
               </Badge>
             </div>
           </div>
-          {(incidentSync?.status === "error" || endpointSync?.status === "error") && (
+          {(incidentSync?.status === "error" || endpointSync?.status === "error" || alertSync?.status === "error") && (
             <p className="text-sm text-severity-critical">
-              {incidentSync?.errorMessage || endpointSync?.errorMessage}
+              {incidentSync?.errorMessage || endpointSync?.errorMessage || alertSync?.errorMessage}
             </p>
           )}
           <div className="flex gap-2">
@@ -293,6 +297,7 @@ export default function SettingsPage() {
             <Button variant="outline" onClick={async () => {
               await db.incidents.clear();
               await db.endpoints.clear();
+              await db.alerts.clear();
               await db.syncMeta.clear();
               syncAll();
             }}>

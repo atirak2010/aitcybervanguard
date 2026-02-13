@@ -20,6 +20,17 @@ export interface Incident {
   alertSources?: string[];
   artifacts?: Artifact[];
   assets?: Asset[];
+  // Extended XDR fields
+  assignedTo?: string;
+  assignedEmail?: string;
+  modifiedTime?: string;
+  highSeverityAlertCount?: number;
+  hostCount?: number;
+  userCount?: number;
+  xdrUrl?: string;
+  starred?: boolean;
+  score?: number | null;
+  notes?: string | null;
 }
 
 export interface AlertSummary {

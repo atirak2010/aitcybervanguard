@@ -1,5 +1,6 @@
-import { Incident, Severity, IncidentStatus } from "@/types/incidents";
+import { Incident, Severity, IncidentStatus, Artifact, ArtifactType, AlertSummary } from "@/types/incidents";
 import { Endpoint, EndpointStatus, EndpointType } from "@/types/endpoints";
+import { Alert } from "@/types/alerts";
 import { AuditEntry } from "@/types/audit";
 import { mockIncidents } from "@/data/mock-incidents";
 import { mockEndpoints } from "@/data/mock-endpoints";
@@ -7,8 +8,11 @@ import { mockAuditLog } from "@/data/mock-audit";
 import {
   getIncidents as xdrGetIncidents,
   getEndpoints as xdrGetEndpoints,
+  getIncidentExtraData as xdrGetIncidentExtraData,
   type XdrIncident,
   type XdrEndpoint,
+  type XdrAlert,
+  type XdrAlertDetail,
 } from "@/services/cortexXdrApi";
 
 // API mode toggle — "real" uses Cortex XDR, "mock" uses local data
@@ -71,6 +75,10 @@ export function mapXdrIncident(xdr: XdrIncident): Incident {
   // Collect all unique hostnames for relatedEndpoints
   const endpointNames = [...new Set(parsedHosts.map((h) => h.name))];
 
+  const modifiedAt = xdr.modification_time
+    ? new Date(xdr.modification_time).toISOString()
+    : undefined;
+
   return {
     id: `INC-${xdr.incident_id}`,
     description: xdr.description || xdr.incident_name || "Untitled Incident",
@@ -86,6 +94,17 @@ export function mapXdrIncident(xdr: XdrIncident): Incident {
     relatedUsers: users,
     alertSources: sources,
     recommendedActions: [],
+    // Extended XDR fields
+    assignedTo: xdr.assigned_user_pretty_name || undefined,
+    assignedEmail: xdr.assigned_user_mail || undefined,
+    modifiedTime: modifiedAt,
+    highSeverityAlertCount: xdr.high_severity_alert_count || 0,
+    hostCount: xdr.host_count || 0,
+    userCount: xdr.user_count || 0,
+    xdrUrl: xdr.xdr_url || undefined,
+    starred: xdr.starred || false,
+    score: xdr.rule_based_score ?? null,
+    notes: xdr.notes ?? null,
   };
 }
 
@@ -122,7 +141,141 @@ export function mapXdrEndpoint(xdr: XdrEndpoint): Endpoint {
     ip: ips[0] || xdr.public_ip || "—",
     username: (xdr.users || []).join(", ") || "—",
     lastSeen: lastSeenDate,
+    contentStatus: (xdr.content_status as string) || undefined,
+    operationalStatus: (xdr.operational_status as string) || undefined,
+    scanStatus: (xdr.scan_status as string) || undefined,
+    assignedPolicy: (xdr.assigned_prevention_policy as string) || undefined,
+    groupName: (xdr.group_name as string[]) || undefined,
+    firstSeen: xdr.first_seen ? new Date(xdr.first_seen).toISOString() : undefined,
+    installDate: (xdr.install_date as number) ? new Date(xdr.install_date as number).toISOString() : undefined,
+    macAddress: (xdr.mac_address as string[]) || undefined,
+    domain: xdr.domain || undefined,
+    publicIp: xdr.public_ip || undefined,
+    isIsolated: xdr.is_isolated === "AGENT_ISOLATED",
   };
+}
+
+// ——— Alerts ———
+
+export function mapXdrAlert(xdr: XdrAlert): Alert {
+  const ts = xdr.detection_timestamp
+    ? new Date(xdr.detection_timestamp).toISOString()
+    : new Date().toISOString();
+
+  return {
+    id: String(xdr.alert_id),
+    name: xdr.name || "Unnamed Alert",
+    severity: mapSeverity(xdr.severity),
+    category: xdr.category || "Unknown",
+    description: xdr.description || "",
+    hostIp: xdr.host_ip || "—",
+    hostName: xdr.host_name || "—",
+    source: xdr.source || "Unknown",
+    action: xdr.action || "—",
+    actionPretty: xdr.action_pretty || xdr.action || "—",
+    timestamp: ts,
+  };
+}
+
+// ——— Incident Extra Data (artifacts from alerts) ———
+
+function extractArtifactsFromAlerts(alerts: XdrAlertDetail[]): Artifact[] {
+  const seen = new Set<string>();
+  const artifacts: Artifact[] = [];
+
+  function add(type: ArtifactType, value: string, description?: string, isMalicious?: boolean) {
+    const key = `${type}:${value}`;
+    if (seen.has(key) || !value) return;
+    seen.add(key);
+    artifacts.push({ id: `art-${artifacts.length + 1}`, type, value, description, isMalicious });
+  }
+
+  for (const a of alerts) {
+    // File hashes (SHA-256)
+    if (a.action_file_sha256) {
+      add("hash", a.action_file_sha256, `File: ${a.action_file_name || a.action_file_path || "unknown"}`, true);
+    }
+    if (a.action_process_image_sha256) {
+      add("hash", a.action_process_image_sha256, `Process: ${a.action_process_image_name || "unknown"}`, true);
+    }
+    if (a.actor_process_image_sha256 && a.actor_process_image_sha256 !== a.action_process_image_sha256) {
+      add("hash", a.actor_process_image_sha256, `Parent Process: ${a.actor_process_image_name || "unknown"}`);
+    }
+    if (a.causality_actor_process_image_sha256 && a.causality_actor_process_image_sha256 !== a.actor_process_image_sha256) {
+      add("hash", a.causality_actor_process_image_sha256, `Causality Process: ${a.causality_actor_process_image_name || "unknown"}`);
+    }
+
+    // MD5 (secondary hash)
+    if (a.action_file_md5) {
+      add("hash", a.action_file_md5, `MD5: ${a.action_file_name || "unknown"}`);
+    }
+
+    // File paths
+    if (a.action_file_path) {
+      add("file", a.action_file_path, `Action file in alert: ${a.name || ""}`, true);
+    }
+
+    // Process names as files
+    if (a.action_process_image_name) {
+      add("file", a.action_process_image_name, `Process executed — ${a.action_process_command_line || ""}`);
+    }
+    if (a.actor_process_image_name && a.actor_process_image_name !== a.action_process_image_name) {
+      add("file", a.actor_process_image_name, `Parent process — ${a.actor_process_command_line || ""}`);
+    }
+
+    // IP addresses
+    if (a.action_remote_ip) {
+      add("ip", a.action_remote_ip, `Remote connection${a.action_remote_port ? ` port ${a.action_remote_port}` : ""}`);
+    }
+    if (a.action_local_ip && a.action_local_ip !== a.host_ip) {
+      add("ip", a.action_local_ip, "Local IP");
+    }
+
+    // DNS / domains
+    if (a.dns_query_name) {
+      add("domain", a.dns_query_name, "DNS query");
+    }
+
+    // Registry
+    if (a.action_registry_key_name) {
+      add("registry", a.action_registry_key_name, a.action_registry_value_name || "Registry modification");
+    }
+  }
+
+  return artifacts;
+}
+
+function mapAlertDetailToSummary(a: XdrAlertDetail): AlertSummary {
+  return {
+    id: String(a.alert_id),
+    name: a.name || "Unnamed Alert",
+    severity: mapSeverity(a.severity),
+    timestamp: a.detection_timestamp
+      ? new Date(a.detection_timestamp).toISOString()
+      : new Date().toISOString(),
+  };
+}
+
+/**
+ * Fetch incident extra data (detailed alerts + artifacts) from XDR API.
+ * Returns enriched Incident with artifacts and alert summaries populated.
+ */
+export async function fetchIncidentExtraData(
+  incidentId: string,
+): Promise<{ artifacts: Artifact[]; alerts: AlertSummary[] } | null> {
+  if (API_MODE === "mock") return null;
+  try {
+    const numericId = incidentId.replace(/^INC-/, "");
+    const extra = await xdrGetIncidentExtraData(numericId);
+    const alertDetails = extra.alerts?.data ?? [];
+    return {
+      artifacts: extractArtifactsFromAlerts(alertDetails),
+      alerts: alertDetails.map(mapAlertDetailToSummary),
+    };
+  } catch (err) {
+    console.error("XDR incident extra data failed:", err);
+    return null;
+  }
 }
 
 // ——— Incidents ———

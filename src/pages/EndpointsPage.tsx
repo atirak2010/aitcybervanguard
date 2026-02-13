@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useEndpoints } from "@/hooks/useEndpoints";
 import { Endpoint } from "@/types/endpoints";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,15 +13,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Search, Shield, ScanSearch, Settings, Eye, Loader2 } from "lucide-react";
+import { Search, Shield, ScanSearch, Settings, Eye, Loader2, Wifi, WifiOff, ShieldCheck, ShieldAlert, Lock } from "lucide-react";
 import { formatDate, formatDateTime, getFlagUrl, getCountryName } from "@/lib/utils";
 
 export default function EndpointsPage() {
   const { hasPermission } = useAuth();
   const { addAuditEntry } = useAudit();
   const { data: allEndpoints = [], isLoading: loading } = useEndpoints();
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "all");
   const [osFilter, setOsFilter] = useState("all");
   const [selectedEndpoint, setSelectedEndpoint] = useState<string | null>(null);
   const [actionDialog, setActionDialog] = useState<{ type: string; target: string } | null>(null);
@@ -32,7 +34,7 @@ export default function EndpointsPage() {
     let list = [...allEndpoints];
     if (search) {
       const q = search.toLowerCase();
-      list = list.filter((e) => e.name.toLowerCase().includes(q) || e.ip.includes(q) || e.username.toLowerCase().includes(q));
+      list = list.filter((e) => e.name.toLowerCase().includes(q) || e.ip.includes(q) || e.username.toLowerCase().includes(q) || (e.domain || "").toLowerCase().includes(q));
     }
     if (statusFilter !== "all") list = list.filter((e) => e.status === statusFilter);
     if (osFilter !== "all") list = list.filter((e) => e.os === osFilter);
@@ -61,6 +63,54 @@ export default function EndpointsPage() {
       <div>
         <h1 className="text-2xl font-bold">Endpoints</h1>
         <p className="text-sm text-muted-foreground">{filtered.length} endpoints</p>
+      </div>
+
+      {/* Health Summary */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-online/10">
+              <Wifi className="h-5 w-5 text-status-online" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Connected</p>
+              <p className="text-xl font-bold text-status-online">{allEndpoints.filter((e) => e.status === "connected").length}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-offline/10">
+              <WifiOff className="h-5 w-5 text-status-offline" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Disconnected</p>
+              <p className="text-xl font-bold">{allEndpoints.filter((e) => e.status === "disconnected").length}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-online/10">
+              <ShieldCheck className="h-5 w-5 text-status-online" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Protected</p>
+              <p className="text-xl font-bold text-status-online">{allEndpoints.filter((e) => e.operationalStatus === "PROTECTED").length}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-severity-medium/10">
+              <ShieldAlert className="h-5 w-5 text-severity-medium" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Content Outdated</p>
+              <p className="text-xl font-bold text-severity-medium">{allEndpoints.filter((e) => e.contentStatus && e.contentStatus !== "UP_TO_DATE").length}</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters */}
@@ -104,6 +154,7 @@ export default function EndpointsPage() {
                   <TableHead>OS</TableHead>
                   <TableHead>Agent</TableHead>
                   <TableHead>IP</TableHead>
+                  <TableHead>Domain</TableHead>
                   <TableHead>User</TableHead>
                   <TableHead>Last Seen</TableHead>
                   <TableHead></TableHead>
@@ -118,6 +169,7 @@ export default function EndpointsPage() {
                     <TableCell className="text-xs">{ep.os}</TableCell>
                     <TableCell className="font-mono text-xs">{ep.agentVersion}</TableCell>
                     <TableCell className="font-mono text-xs">{ep.ip}{getFlagUrl(ep.ip) && <img src={getFlagUrl(ep.ip)!} alt={getCountryName(ep.ip)} title={getCountryName(ep.ip)} className="ml-1 inline-block h-[13px] w-[18px] rounded-sm border border-border/50" />}</TableCell>
+                    <TableCell className="text-xs">{ep.domain || "—"}</TableCell>
                     <TableCell className="text-xs">{ep.username}</TableCell>
                     <TableCell className="text-xs">{formatDate(ep.lastSeen)}</TableCell>
                     <TableCell>
@@ -128,7 +180,7 @@ export default function EndpointsPage() {
                   </TableRow>
                 ))}
                 {filtered.length === 0 && (
-                  <TableRow><TableCell colSpan={9} className="py-8 text-center text-muted-foreground">No endpoints match your filters.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={10} className="py-8 text-center text-muted-foreground">No endpoints match your filters.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -151,8 +203,36 @@ export default function EndpointsPage() {
                 <div className="flex justify-between"><span className="text-muted-foreground">OS</span><span>{selected.os}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Agent</span><span className="font-mono">{selected.agentVersion}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">IP</span><span className="font-mono">{selected.ip}{getFlagUrl(selected.ip) && <img src={getFlagUrl(selected.ip)!} alt={getCountryName(selected.ip)} title={getCountryName(selected.ip)} className="ml-1 inline-block h-[13px] w-[18px] rounded-sm border border-border/50" />}</span></div>
+                {selected.publicIp && selected.publicIp !== selected.ip && (
+                  <div className="flex justify-between"><span className="text-muted-foreground">Public IP</span><span className="font-mono">{selected.publicIp}{getFlagUrl(selected.publicIp) && <img src={getFlagUrl(selected.publicIp)!} alt={getCountryName(selected.publicIp)} title={getCountryName(selected.publicIp)} className="ml-1 inline-block h-[13px] w-[18px] rounded-sm border border-border/50" />}</span></div>
+                )}
+                {selected.domain && <div className="flex justify-between"><span className="text-muted-foreground">Domain</span><span className="text-xs">{selected.domain}</span></div>}
+                {selected.isIsolated && (
+                  <div className="flex items-center gap-1.5 text-severity-critical">
+                    <Lock className="h-3.5 w-3.5" /> Endpoint Isolated
+                  </div>
+                )}
                 <div className="flex justify-between"><span className="text-muted-foreground">User</span><span>{selected.username}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Last Seen</span><span>{formatDateTime(selected.lastSeen)}</span></div>
+                {selected.assignedPolicy && <div className="flex justify-between"><span className="text-muted-foreground">Policy</span><span className="text-xs">{selected.assignedPolicy}</span></div>}
+                {selected.operationalStatus && (
+                  <div className="flex justify-between"><span className="text-muted-foreground">Protection</span>
+                    <Badge variant={selected.operationalStatus === "PROTECTED" ? "default" : "destructive"} className="text-xs">
+                      {selected.operationalStatus.replace(/_/g, " ")}
+                    </Badge>
+                  </div>
+                )}
+                {selected.contentStatus && (
+                  <div className="flex justify-between"><span className="text-muted-foreground">Content</span>
+                    <Badge variant={selected.contentStatus === "UP_TO_DATE" ? "secondary" : "destructive"} className="text-xs">
+                      {selected.contentStatus.replace(/_/g, " ")}
+                    </Badge>
+                  </div>
+                )}
+                {selected.scanStatus && <div className="flex justify-between"><span className="text-muted-foreground">Scan</span><span className="text-xs">{selected.scanStatus.replace(/SCAN_STATUS_/g, "").replace(/_/g, " ")}</span></div>}
+                {selected.groupName && selected.groupName.length > 0 && <div className="flex justify-between gap-2"><span className="text-muted-foreground shrink-0">Group</span><span className="text-xs text-right">{selected.groupName.join(", ")}</span></div>}
+                {selected.macAddress && selected.macAddress.length > 0 && <div className="flex justify-between"><span className="text-muted-foreground">MAC</span><span className="font-mono text-xs">{selected.macAddress[0]}</span></div>}
+                {selected.firstSeen && <div className="flex justify-between"><span className="text-muted-foreground">First Seen</span><span className="text-xs">{formatDateTime(selected.firstSeen)}</span></div>}
               </CardContent>
             </Card>
 

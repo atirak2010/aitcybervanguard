@@ -1,10 +1,11 @@
 import { db, type SyncMeta } from "@/db/csocDatabase";
-import { API_MODE, mapXdrIncident, mapXdrEndpoint } from "@/services/api";
+import { API_MODE, mapXdrIncident, mapXdrEndpoint, mapXdrAlert } from "@/services/api";
 import { mockIncidents } from "@/data/mock-incidents";
 import { mockEndpoints } from "@/data/mock-endpoints";
 import {
   getIncidents as xdrGetIncidents,
   getEndpoints as xdrGetEndpoints,
+  getAlerts as xdrGetAlerts,
 } from "@/services/cortexXdrApi";
 
 const PAGE_SIZE = 100;
@@ -181,10 +182,91 @@ async function syncEndpoints(): Promise<void> {
   }
 }
 
+// --- Alert sync ---
+
+async function syncAlerts(): Promise<void> {
+  const metaKey = "alerts";
+  const ALERT_MAX_PAGES = 10; // up to 1000 alerts
+
+  const syncingMeta: SyncMeta = {
+    key: metaKey,
+    lastSyncedAt: Date.now(),
+    totalCount: 0,
+    syncedCount: 0,
+    status: "syncing",
+  };
+  await db.syncMeta.put(syncingMeta);
+  notify(syncingMeta);
+
+  if (API_MODE === "mock") {
+    const meta: SyncMeta = {
+      key: metaKey,
+      lastSyncedAt: Date.now(),
+      totalCount: 0,
+      syncedCount: 0,
+      status: "idle",
+    };
+    await db.syncMeta.put(meta);
+    notify(meta);
+    return;
+  }
+
+  try {
+    let totalFetched = 0;
+    // Fetch only alerts from the last 30 days so data spreads across dates
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const timeFilter = [{ field: "creation_time", operator: "gte" as const, value: thirtyDaysAgo }];
+
+    for (let page = 0; page < ALERT_MAX_PAGES; page++) {
+      const from = page * PAGE_SIZE;
+      const to = from + PAGE_SIZE;
+      const result = await xdrGetAlerts(timeFilter, from, to);
+
+      const mapped = result.alerts.map(mapXdrAlert);
+      await db.alerts.bulkPut(mapped);
+      totalFetched += mapped.length;
+
+      const progressMeta: SyncMeta = {
+        key: metaKey,
+        lastSyncedAt: Date.now(),
+        totalCount: result.total_count,
+        syncedCount: totalFetched,
+        status: "syncing",
+      };
+      await db.syncMeta.put(progressMeta);
+      notify(progressMeta);
+
+      if (result.alerts.length < PAGE_SIZE) break;
+    }
+
+    const meta: SyncMeta = {
+      key: metaKey,
+      lastSyncedAt: Date.now(),
+      totalCount: totalFetched,
+      syncedCount: totalFetched,
+      status: "idle",
+    };
+    await db.syncMeta.put(meta);
+    notify(meta);
+  } catch (err) {
+    const cachedCount = await db.alerts.count();
+    const errorMeta: SyncMeta = {
+      key: metaKey,
+      lastSyncedAt: Date.now(),
+      totalCount: 0,
+      syncedCount: cachedCount,
+      status: "error",
+      errorMessage: err instanceof Error ? err.message : "Sync failed",
+    };
+    await db.syncMeta.put(errorMeta);
+    notify(errorMeta);
+  }
+}
+
 // --- Public API ---
 
 export async function syncAll(): Promise<void> {
-  await Promise.all([syncIncidents(), syncEndpoints()]);
+  await Promise.all([syncIncidents(), syncEndpoints(), syncAlerts()]);
 }
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
