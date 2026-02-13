@@ -1,4 +1,4 @@
-import { LayoutDashboard, AlertTriangle, Monitor, FileText } from "lucide-react";
+import { LayoutDashboard, AlertTriangle, Monitor, FileText, Settings } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -23,6 +23,7 @@ const navItems = [
 
 const restrictedItems = [
   { title: "Audit Log", url: "/audit-log", icon: FileText, requiredRole: ["manager", "admin"] as string[] },
+  { title: "Settings", url: "/settings", icon: Settings, requiredRole: ["admin"] as string[] },
 ];
 
 export function AppSidebar() {

@@ -14,6 +14,7 @@ import IncidentsPage from "@/pages/IncidentsPage";
 import IncidentDetailPage from "@/pages/IncidentDetailPage";
 import EndpointsPage from "@/pages/EndpointsPage";
 import AuditLogPage from "@/pages/AuditLogPage";
+import SettingsPage from "@/pages/SettingsPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ function AuthRouter() {
         <Route path="incidents/:id" element={<IncidentDetailPage />} />
         <Route path="endpoints" element={<EndpointsPage />} />
         <Route path="audit-log" element={<ProtectedRoute requiredPermission="viewAuditLog"><AuditLogPage /></ProtectedRoute>} />
+        <Route path="settings" element={<ProtectedRoute requiredPermission="viewAuditLog"><SettingsPage /></ProtectedRoute>} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

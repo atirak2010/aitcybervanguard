@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "WebFetch(domain:docs-cortex.paloaltonetworks.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:cortex-panw.stoplight.io)",
+      "WebFetch(domain:docs.redlabnet.com)",
+      "WebFetch(domain:docs.octoxlabs.com)",
+      "Bash(npx vite:*)",
+      "Bash(timeout:*)"
     ]
   }
 }

@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
-import { mockEndpoints } from "@/data/mock-endpoints";
+import { useState, useMemo, useEffect } from "react";
+import { fetchEndpoints } from "@/services/api";
+import { Endpoint } from "@/types/endpoints";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAudit } from "@/contexts/AuditContext";
 import { EndpointStatusBadge } from "@/components/StatusBadges";
@@ -11,12 +12,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Search, Shield, ScanSearch, Settings, Eye } from "lucide-react";
+import { Search, Shield, ScanSearch, Settings, Eye, Loader2 } from "lucide-react";
 import { formatDate, formatDateTime, getFlagUrl, getCountryName } from "@/lib/utils";
 
 export default function EndpointsPage() {
   const { hasPermission } = useAuth();
   const { addAuditEntry } = useAudit();
+  const [allEndpoints, setAllEndpoints] = useState<Endpoint[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [osFilter, setOsFilter] = useState("all");
@@ -24,10 +27,22 @@ export default function EndpointsPage() {
   const [actionDialog, setActionDialog] = useState<{ type: string; target: string } | null>(null);
   const [comment, setComment] = useState("");
 
-  const osList = useMemo(() => [...new Set(mockEndpoints.map((e) => e.os))], []);
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetchEndpoints().then((data) => {
+      if (!cancelled) {
+        setAllEndpoints(data);
+        setLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const osList = useMemo(() => [...new Set(allEndpoints.map((e) => e.os))], [allEndpoints]);
 
   const filtered = useMemo(() => {
-    let list = [...mockEndpoints];
+    let list = [...allEndpoints];
     if (search) {
       const q = search.toLowerCase();
       list = list.filter((e) => e.name.toLowerCase().includes(q) || e.ip.includes(q) || e.username.toLowerCase().includes(q));
@@ -35,15 +50,24 @@ export default function EndpointsPage() {
     if (statusFilter !== "all") list = list.filter((e) => e.status === statusFilter);
     if (osFilter !== "all") list = list.filter((e) => e.os === osFilter);
     return list;
-  }, [search, statusFilter, osFilter]);
+  }, [search, statusFilter, osFilter, allEndpoints]);
 
-  const selected = selectedEndpoint ? mockEndpoints.find((e) => e.id === selectedEndpoint) : null;
+  const selected = selectedEndpoint ? allEndpoints.find((e) => e.id === selectedEndpoint) : null;
 
   const executeAction = (type: string, target: string) => {
     addAuditEntry(type as any, target, "success", comment || "Action executed");
     setActionDialog(null);
     setComment("");
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-3 text-muted-foreground">Loading endpoints from Cortex XDR...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

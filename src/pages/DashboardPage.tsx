@@ -1,12 +1,13 @@
-import { useState, useMemo } from "react";
-import { mockIncidents } from "@/data/mock-incidents";
-import { mockEndpoints } from "@/data/mock-endpoints";
+import { useState, useMemo, useEffect } from "react";
+import { fetchIncidents, fetchEndpoints } from "@/services/api";
+import { Incident } from "@/types/incidents";
+import { Endpoint } from "@/types/endpoints";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SeverityBadge } from "@/components/StatusBadges";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend } from "recharts";
-import { AlertTriangle, ShieldAlert, ShieldCheck, Activity } from "lucide-react";
+import { AlertTriangle, ShieldAlert, ShieldCheck, Activity, Loader2 } from "lucide-react";
 import AttackVectorsChart from "@/components/dashboard/AttackVectorsChart";
 import ActiveIncidentsTable from "@/components/dashboard/ActiveIncidentsTable";
 import { getFlagUrl, getCountryName } from "@/lib/utils";
@@ -22,7 +23,23 @@ const SEVERITY_COLORS = {
 type TimeFilter = "24h" | "7d" | "30d";
 
 export default function DashboardPage() {
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>("7d");
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>("30d");
+  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    Promise.all([fetchIncidents(), fetchEndpoints()]).then(([inc, ep]) => {
+      if (!cancelled) {
+        setIncidents(inc);
+        setEndpoints(ep);
+        setLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const filteredIncidents = useMemo(() => {
     const now = new Date();
@@ -30,8 +47,8 @@ export default function DashboardPage() {
     if (timeFilter === "24h") cutoff.setHours(now.getHours() - 24);
     else if (timeFilter === "7d") cutoff.setDate(now.getDate() - 7);
     else cutoff.setDate(now.getDate() - 30);
-    return mockIncidents.filter((i) => new Date(`${i.date}T${i.time}`) >= cutoff);
-  }, [timeFilter]);
+    return incidents.filter((i) => new Date(`${i.date}T${i.time}`) >= cutoff);
+  }, [timeFilter, incidents]);
 
   const totalIncidents = filteredIncidents.length;
   const criticalIncidents = filteredIncidents.filter((i) => i.severity === "critical").length;
@@ -53,39 +70,38 @@ export default function DashboardPage() {
     return Object.entries(days).sort().map(([date, counts]) => ({ date: date.slice(5), ...counts }));
   }, [filteredIncidents]);
 
-const topAttackers = useMemo(() => {
-     const counts: Record<string, number> = {};
-     filteredIncidents.forEach((i) => { counts[i.source] = (counts[i.source] || 0) + 1; });
-     return Object.entries(counts)
-       .sort((a, b) => b[1] - a[1])
-       .slice(0, 10)
-       .map(([source, count]) => {
-         const endpoint = mockEndpoints.find((ep) => ep.name === source || ep.ip === source);
-         return {
-           source,
-           name: endpoint?.name || source,
-           ip: endpoint?.ip || "—",
-           count,
-         };
-       });
-   }, [filteredIncidents]);
+  const topAttackers = useMemo(() => {
+    const counts: Record<string, number> = {};
+    filteredIncidents.forEach((i) => { counts[i.source] = (counts[i.source] || 0) + 1; });
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([source, count]) => {
+        const endpoint = endpoints.find((ep) => ep.name === source || ep.ip === source);
+        return { source, name: endpoint?.name || source, ip: endpoint?.ip || "—", count };
+      });
+  }, [filteredIncidents, endpoints]);
 
-const topVictims = useMemo(() => {
-     const counts: Record<string, number> = {};
-     filteredIncidents.forEach((i) => { counts[i.destination] = (counts[i.destination] || 0) + 1; });
-     return Object.entries(counts)
-       .sort((a, b) => b[1] - a[1])
-       .slice(0, 10)
-       .map(([target, count]) => {
-         const endpoint = mockEndpoints.find((ep) => ep.name === target || ep.ip === target);
-         return {
-           target,
-           name: endpoint?.name || target,
-           ip: endpoint?.ip || "—",
-           count,
-         };
-       });
-   }, [filteredIncidents]);
+  const topVictims = useMemo(() => {
+    const counts: Record<string, number> = {};
+    filteredIncidents.forEach((i) => { counts[i.destination] = (counts[i.destination] || 0) + 1; });
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([target, count]) => {
+        const endpoint = endpoints.find((ep) => ep.name === target || ep.ip === target);
+        return { target, name: endpoint?.name || target, ip: endpoint?.ip || "—", count };
+      });
+  }, [filteredIncidents, endpoints]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-3 text-muted-foreground">Loading data from Cortex XDR...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -210,18 +226,18 @@ const topVictims = useMemo(() => {
               </TableHeader>
               <TableBody>
                 {topAttackers.map((a) => {
-                   const flagUrl = getFlagUrl(a.source) || getFlagUrl(a.ip);
-                   const country = getCountryName(a.source) || getCountryName(a.ip);
-                   return (
-                     <TableRow key={a.source}>
-                       <TableCell className="font-mono text-sm">
-                         {a.name ? `${a.name} (${a.ip})` : a.ip}
-                         {flagUrl && <img src={flagUrl} alt={country} title={country} className="ml-1.5 inline-block h-[15px] w-[20px] rounded-sm border border-border/50" />}
-                       </TableCell>
-                       <TableCell className="text-right">{a.count}</TableCell>
-                     </TableRow>
-                   );
-                 })}
+                  const flagUrl = getFlagUrl(a.source) || getFlagUrl(a.ip);
+                  const country = getCountryName(a.source) || getCountryName(a.ip);
+                  return (
+                    <TableRow key={a.source}>
+                      <TableCell className="font-mono text-sm">
+                        {a.name ? `${a.name} (${a.ip})` : a.ip}
+                        {flagUrl && <img src={flagUrl} alt={country} title={country} className="ml-1.5 inline-block h-[15px] w-[20px] rounded-sm border border-border/50" />}
+                      </TableCell>
+                      <TableCell className="text-right">{a.count}</TableCell>
+                    </TableRow>
+                  );
+                })}
                 {topAttackers.length === 0 && (
                   <TableRow><TableCell colSpan={2} className="text-center text-muted-foreground">No data</TableCell></TableRow>
                 )}
@@ -241,18 +257,18 @@ const topVictims = useMemo(() => {
               </TableHeader>
               <TableBody>
                 {topVictims.map((v) => {
-                   const flagUrl = getFlagUrl(v.target) || getFlagUrl(v.ip);
-                   const country = getCountryName(v.target) || getCountryName(v.ip);
-                   return (
-                     <TableRow key={v.target}>
-                       <TableCell className="font-mono text-sm">
-                         {v.name ? `${v.name} (${v.ip})` : v.ip}
-                         {flagUrl && <img src={flagUrl} alt={country} title={country} className="ml-1.5 inline-block h-[15px] w-[20px] rounded-sm border border-border/50" />}
-                       </TableCell>
-                       <TableCell className="text-right">{v.count}</TableCell>
-                     </TableRow>
-                   );
-                 })}
+                  const flagUrl = getFlagUrl(v.target) || getFlagUrl(v.ip);
+                  const country = getCountryName(v.target) || getCountryName(v.ip);
+                  return (
+                    <TableRow key={v.target}>
+                      <TableCell className="font-mono text-sm">
+                        {v.name ? `${v.name} (${v.ip})` : v.ip}
+                        {flagUrl && <img src={flagUrl} alt={country} title={country} className="ml-1.5 inline-block h-[15px] w-[20px] rounded-sm border border-border/50" />}
+                      </TableCell>
+                      <TableCell className="text-right">{v.count}</TableCell>
+                    </TableRow>
+                  );
+                })}
                 {topVictims.length === 0 && (
                   <TableRow><TableCell colSpan={2} className="text-center text-muted-foreground">No data</TableCell></TableRow>
                 )}

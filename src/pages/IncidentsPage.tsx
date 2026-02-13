@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { mockIncidents } from "@/data/mock-incidents";
+import { useState, useMemo, useEffect } from "react";
+import { fetchIncidents } from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Incident, Severity, IncidentStatus } from "@/types/incidents";
 import { SeverityBadge, StatusBadge } from "@/components/StatusBadges";
@@ -9,13 +9,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Download, Eye, ArrowUpDown } from "lucide-react";
+import { Search, Download, Eye, ArrowUpDown, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { getFlagUrl, getCountryName } from "@/lib/utils";
 
 export default function IncidentsPage() {
   const { hasPermission } = useAuth();
   const navigate = useNavigate();
+  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [severityFilter, setSeverityFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -24,8 +26,20 @@ export default function IncidentsPage() {
   const [page, setPage] = useState(1);
   const perPage = 10;
 
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetchIncidents().then((data) => {
+      if (!cancelled) {
+        setIncidents(data);
+        setLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
+
   const filtered = useMemo(() => {
-    let list = [...mockIncidents];
+    let list = [...incidents];
     if (search) {
       const q = search.toLowerCase();
       list = list.filter((i) => i.id.toLowerCase().includes(q) || i.description.toLowerCase().includes(q));
@@ -38,7 +52,7 @@ export default function IncidentsPage() {
       return sortDir === "asc" ? String(aVal).localeCompare(String(bVal)) : String(bVal).localeCompare(String(aVal));
     });
     return list;
-  }, [search, severityFilter, statusFilter, sortField, sortDir]);
+  }, [search, severityFilter, statusFilter, sortField, sortDir, incidents]);
 
   const totalPages = Math.ceil(filtered.length / perPage);
   const paged = filtered.slice((page - 1) * perPage, page * perPage);
@@ -60,6 +74,15 @@ export default function IncidentsPage() {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-3 text-muted-foreground">Loading incidents from Cortex XDR...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { mockIncidents } from "@/data/mock-incidents";
+import { fetchIncidentById } from "@/services/api";
+import { Incident, ArtifactType } from "@/types/incidents";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAudit } from "@/contexts/AuditContext";
 import { SeverityBadge, StatusBadge } from "@/components/StatusBadges";
@@ -10,9 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Shield, Skull, FileX, Ban, CheckCircle, FileText, Globe, Link, Hash, Mail, Database, Monitor, Server, Laptop, Network } from "lucide-react";
+import { ArrowLeft, Shield, Skull, FileX, Ban, CheckCircle, FileText, Globe, Link, Hash, Mail, Database, Monitor, Server, Laptop, Network, Loader2 } from "lucide-react";
 import { formatDateTime, getFlagUrl, getCountryName } from "@/lib/utils";
-import { ArtifactType } from "@/types/incidents";
 
 const ARTIFACT_ICON: Record<ArtifactType, typeof FileText> = {
   file: FileText,
@@ -45,10 +45,34 @@ export default function IncidentDetailPage() {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
   const { addAuditEntry } = useAudit();
-  const incident = mockIncidents.find((i) => i.id === id);
+
+  const [incident, setIncident] = useState<Incident | undefined>(undefined);
+  const [loading, setLoading] = useState(true);
   const [actionComment, setActionComment] = useState("");
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    setLoading(true);
+    fetchIncidentById(id).then((data) => {
+      if (!cancelled) {
+        setIncident(data);
+        setLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-3 text-muted-foreground">Loading incident details...</span>
+      </div>
+    );
+  }
 
   if (!incident) {
     return (
