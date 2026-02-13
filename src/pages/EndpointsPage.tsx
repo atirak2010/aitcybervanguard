@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Search, Shield, ScanSearch, Settings, Eye } from "lucide-react";
-import { formatDate, formatDateTime } from "@/lib/utils";
+import { formatDate, formatDateTime, getFlagUrl, getCountryName } from "@/lib/utils";
 
 export default function EndpointsPage() {
   const { hasPermission } = useAuth();
@@ -104,7 +104,7 @@ export default function EndpointsPage() {
                     <TableCell><EndpointStatusBadge status={ep.status} /></TableCell>
                     <TableCell className="text-xs">{ep.os}</TableCell>
                     <TableCell className="font-mono text-xs">{ep.agentVersion}</TableCell>
-                    <TableCell className="font-mono text-xs">{ep.ip}</TableCell>
+                    <TableCell className="font-mono text-xs">{ep.ip}{getFlagUrl(ep.ip) && <img src={getFlagUrl(ep.ip)!} alt={getCountryName(ep.ip)} title={getCountryName(ep.ip)} className="ml-1 inline-block h-[13px] w-[18px] rounded-sm border border-border/50" />}</TableCell>
                     <TableCell className="text-xs">{ep.username}</TableCell>
                     <TableCell className="text-xs">{formatDate(ep.lastSeen)}</TableCell>
                     <TableCell>
@@ -137,7 +137,7 @@ export default function EndpointsPage() {
                 <div className="flex justify-between"><span className="text-muted-foreground">Type</span><span className="capitalize">{selected.type}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">OS</span><span>{selected.os}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Agent</span><span className="font-mono">{selected.agentVersion}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">IP</span><span className="font-mono">{selected.ip}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">IP</span><span className="font-mono">{selected.ip}{getFlagUrl(selected.ip) && <img src={getFlagUrl(selected.ip)!} alt={getCountryName(selected.ip)} title={getCountryName(selected.ip)} className="ml-1 inline-block h-[13px] w-[18px] rounded-sm border border-border/50" />}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">User</span><span>{selected.username}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Last Seen</span><span>{formatDateTime(selected.lastSeen)}</span></div>
               </CardContent>

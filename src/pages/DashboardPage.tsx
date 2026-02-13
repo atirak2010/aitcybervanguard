@@ -5,11 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SeverityBadge } from "@/components/StatusBadges";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend } from "recharts";
 import { AlertTriangle, ShieldAlert, ShieldCheck, Activity } from "lucide-react";
 import AttackVectorsChart from "@/components/dashboard/AttackVectorsChart";
 import ActiveIncidentsTable from "@/components/dashboard/ActiveIncidentsTable";
-import { getCountryFlag } from "@/lib/utils";
+import { getFlagUrl, getCountryName } from "@/lib/utils";
 
 const SEVERITY_COLORS = {
   critical: "hsl(0, 72%, 51%)",
@@ -45,9 +45,12 @@ export default function DashboardPage() {
   }, [filteredIncidents]);
 
   const trendData = useMemo(() => {
-    const days: Record<string, number> = {};
-    filteredIncidents.forEach((i) => { days[i.date] = (days[i.date] || 0) + 1; });
-    return Object.entries(days).sort().map(([date, count]) => ({ date: date.slice(5), count }));
+    const days: Record<string, Record<string, number>> = {};
+    filteredIncidents.forEach((i) => {
+      if (!days[i.date]) days[i.date] = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+      days[i.date][i.severity] = (days[i.date][i.severity] || 0) + 1;
+    });
+    return Object.entries(days).sort().map(([date, counts]) => ({ date: date.slice(5), ...counts }));
   }, [filteredIncidents]);
 
 const topAttackers = useMemo(() => {
@@ -170,16 +173,21 @@ const topVictims = useMemo(() => {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader><CardTitle className="text-base">Incident Trend</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Incident Trend by Severity</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={trendData}>
+              <BarChart data={trendData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" fontSize={12} />
                 <YAxis allowDecimals={false} fontSize={12} />
                 <Tooltip />
-                <Line type="monotone" dataKey="count" stroke="hsl(220, 70%, 45%)" strokeWidth={2} dot={{ r: 4 }} />
-              </LineChart>
+                <Legend />
+                <Bar dataKey="critical" stackId="severity" fill={SEVERITY_COLORS.critical} name="Critical" />
+                <Bar dataKey="high" stackId="severity" fill={SEVERITY_COLORS.high} name="High" />
+                <Bar dataKey="medium" stackId="severity" fill={SEVERITY_COLORS.medium} name="Medium" />
+                <Bar dataKey="low" stackId="severity" fill={SEVERITY_COLORS.low} name="Low" />
+                <Bar dataKey="info" stackId="severity" fill={SEVERITY_COLORS.info} name="Info" />
+              </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
@@ -202,12 +210,13 @@ const topVictims = useMemo(() => {
               </TableHeader>
               <TableBody>
                 {topAttackers.map((a) => {
-                   const flag = getCountryFlag(a.source) || getCountryFlag(a.ip);
+                   const flagUrl = getFlagUrl(a.source) || getFlagUrl(a.ip);
+                   const country = getCountryName(a.source) || getCountryName(a.ip);
                    return (
                      <TableRow key={a.source}>
                        <TableCell className="font-mono text-sm">
                          {a.name ? `${a.name} (${a.ip})` : a.ip}
-                         {flag && <span className="ml-1.5">{flag}</span>}
+                         {flagUrl && <img src={flagUrl} alt={country} title={country} className="ml-1.5 inline-block h-[15px] w-[20px] rounded-sm border border-border/50" />}
                        </TableCell>
                        <TableCell className="text-right">{a.count}</TableCell>
                      </TableRow>
@@ -232,12 +241,13 @@ const topVictims = useMemo(() => {
               </TableHeader>
               <TableBody>
                 {topVictims.map((v) => {
-                   const flag = getCountryFlag(v.target) || getCountryFlag(v.ip);
+                   const flagUrl = getFlagUrl(v.target) || getFlagUrl(v.ip);
+                   const country = getCountryName(v.target) || getCountryName(v.ip);
                    return (
                      <TableRow key={v.target}>
                        <TableCell className="font-mono text-sm">
                          {v.name ? `${v.name} (${v.ip})` : v.ip}
-                         {flag && <span className="ml-1.5">{flag}</span>}
+                         {flagUrl && <img src={flagUrl} alt={country} title={country} className="ml-1.5 inline-block h-[15px] w-[20px] rounded-sm border border-border/50" />}
                        </TableCell>
                        <TableCell className="text-right">{v.count}</TableCell>
                      </TableRow>

@@ -21,10 +21,17 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md space-y-6">
+    <div className="relative flex min-h-screen items-center justify-center bg-background p-4 overflow-hidden">
+      {/* Background decoration */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-40 -right-40 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] rounded-full bg-primary/[0.02] blur-3xl" />
+      </div>
+
+      <div className="relative w-full max-w-md space-y-6">
         <div className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 shadow-lg shadow-primary/20 ring-1 ring-primary/20">
             <Shield className="h-8 w-8 text-primary" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight">AIT Cyber Vanguard</h1>
@@ -41,11 +48,13 @@ export default function LoginPage() {
               <Button
                 key={role}
                 variant="outline"
-                className="flex h-auto w-full items-start justify-start gap-3 p-4 text-left"
+                className="flex h-auto w-full items-start justify-start gap-3 p-4 text-left group hover:border-primary/40 hover:shadow-md hover:shadow-primary/10"
                 disabled={loading !== null}
                 onClick={() => handleLogin(role)}
               >
-                <Icon className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 shadow-sm group-hover:bg-primary/15 group-hover:shadow-md group-hover:shadow-primary/15 transition-all">
+                  <Icon className="h-5 w-5 text-primary" />
+                </div>
                 <div>
                   <p className="font-semibold">{ROLE_LABELS[role]}</p>
                   <p className="text-xs text-muted-foreground">{desc}</p>
@@ -55,7 +64,7 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
-        <p className="text-center text-xs text-muted-foreground">Mock authentication — No credentials required</p>
+        <p className="text-center text-xs text-muted-foreground/60">Mock authentication — No credentials required</p>
       </div>
     </div>
   );

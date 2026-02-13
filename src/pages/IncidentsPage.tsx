@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Search, Download, Eye, ArrowUpDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { getFlagUrl, getCountryName } from "@/lib/utils";
 
 export default function IncidentsPage() {
   const { hasPermission } = useAuth();
@@ -47,8 +49,8 @@ export default function IncidentsPage() {
   };
 
   const exportCsv = () => {
-    const headers = ["Incident ID", "Description", "Severity", "Alerts Count", "Source", "Destination", "Date", "Time", "Status"];
-    const rows = filtered.map((i) => [i.id, `"${i.description}"`, i.severity, i.alertCount, i.source, i.destination, i.date, i.time, i.status]);
+    const headers = ["Incident ID", "Description", "Severity", "Alerts Count", "Source", "Destination", "User", "Alert Sources", "Date", "Time", "Status"];
+    const rows = filtered.map((i) => [i.id, `"${i.description}"`, i.severity, i.alertCount, i.source, i.destination, `"${i.relatedUsers?.join("; ") || ""}"`, `"${i.alertSources?.join("; ") || ""}"`, i.date, i.time, i.status]);
     const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -114,6 +116,7 @@ export default function IncidentsPage() {
                 <TableHead>Source</TableHead>
                 <TableHead>Destination</TableHead>
                 <TableHead>User</TableHead>
+                <TableHead>Alert Sources</TableHead>
                 <TableHead className="cursor-pointer" onClick={() => toggleSort("date")}>Date <ArrowUpDown className="ml-1 inline h-3 w-3" /></TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Action</TableHead>
@@ -126,9 +129,14 @@ export default function IncidentsPage() {
                   <TableCell className="max-w-[200px] truncate text-sm">{i.description}</TableCell>
                   <TableCell><SeverityBadge severity={i.severity} /></TableCell>
                   <TableCell>{i.alertCount}</TableCell>
-                  <TableCell className="font-mono text-xs">{i.source}</TableCell>
-                  <TableCell className="font-mono text-xs">{i.destination}</TableCell>
+                  <TableCell className="font-mono text-xs">{i.source}{getFlagUrl(i.source) && <img src={getFlagUrl(i.source)!} alt={getCountryName(i.source)} title={getCountryName(i.source)} className="ml-1 inline-block h-[13px] w-[18px] rounded-sm border border-border/50" />}</TableCell>
+                  <TableCell className="font-mono text-xs">{i.destination}{getFlagUrl(i.destination) && <img src={getFlagUrl(i.destination)!} alt={getCountryName(i.destination)} title={getCountryName(i.destination)} className="ml-1 inline-block h-[13px] w-[18px] rounded-sm border border-border/50" />}</TableCell>
                   <TableCell className="text-xs">{i.relatedUsers?.join(", ") || "—"}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {i.alertSources?.map((s) => <Badge key={s} variant="outline" className="text-xs">{s}</Badge>) || <span className="text-xs text-muted-foreground">—</span>}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-xs">{i.date} {i.time.slice(0, 5)}</TableCell>
                   <TableCell><StatusBadge status={i.status} /></TableCell>
                   <TableCell>
@@ -139,7 +147,7 @@ export default function IncidentsPage() {
                 </TableRow>
               ))}
               {paged.length === 0 && (
-                <TableRow><TableCell colSpan={10} className="py-8 text-center text-muted-foreground">No incidents match your filters.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={11} className="py-8 text-center text-muted-foreground">No incidents match your filters.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>

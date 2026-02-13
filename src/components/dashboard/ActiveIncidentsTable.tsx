@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SeverityBadge, StatusBadge } from "@/components/StatusBadges";
+import { Badge } from "@/components/ui/badge";
 import { Incident } from "@/types/incidents";
 import { useNavigate } from "react-router-dom";
 
@@ -28,6 +29,7 @@ export default function ActiveIncidentsTable({ incidents }: Props) {
               <TableHead>Severity</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>User</TableHead>
+              <TableHead>Alert Sources</TableHead>
               <TableHead className="text-right">Alerts</TableHead>
             </TableRow>
           </TableHeader>
@@ -43,12 +45,17 @@ export default function ActiveIncidentsTable({ incidents }: Props) {
                 <TableCell><SeverityBadge severity={i.severity} /></TableCell>
                 <TableCell><StatusBadge status={i.status} /></TableCell>
                 <TableCell className="text-xs">{i.relatedUsers?.join(", ") || "—"}</TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap gap-1">
+                    {i.alertSources?.map((s) => <Badge key={s} variant="outline" className="text-xs">{s}</Badge>) || <span className="text-xs text-muted-foreground">—</span>}
+                  </div>
+                </TableCell>
                 <TableCell className="text-right">{i.alertCount}</TableCell>
               </TableRow>
             ))}
             {active.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                <TableCell colSpan={7} className="text-center text-muted-foreground">
                   No active incidents
                 </TableCell>
               </TableRow>

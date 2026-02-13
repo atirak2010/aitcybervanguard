@@ -9,8 +9,28 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ArrowLeft, Shield, Skull, FileX, Ban, CheckCircle } from "lucide-react";
-import { formatDateTime } from "@/lib/utils";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ArrowLeft, Shield, Skull, FileX, Ban, CheckCircle, FileText, Globe, Link, Hash, Mail, Database, Monitor, Server, Laptop, Network } from "lucide-react";
+import { formatDateTime, getFlagUrl, getCountryName } from "@/lib/utils";
+import { ArtifactType } from "@/types/incidents";
+
+const ARTIFACT_ICON: Record<ArtifactType, typeof FileText> = {
+  file: FileText,
+  ip: Globe,
+  domain: Globe,
+  url: Link,
+  hash: Hash,
+  registry: Database,
+  email: Mail,
+};
+
+const ASSET_ICON: Record<string, typeof Monitor> = {
+  workstation: Laptop,
+  server: Server,
+  vm: Monitor,
+  network: Network,
+  other: Monitor,
+};
 
 const responseActions = [
   { id: "isolate_endpoint", label: "Isolate Endpoint", icon: Shield, permission: "endpointActions" as const },
@@ -105,6 +125,96 @@ export default function IncidentDetailPage() {
                     </div>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Artifacts */}
+          {incident.artifacts && incident.artifacts.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Artifacts ({incident.artifacts.length})</CardTitle></CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Value</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Verdict</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {incident.artifacts.map((art) => {
+                      const Icon = ARTIFACT_ICON[art.type] || FileText;
+                      const flagUrl = art.type === "ip" ? getFlagUrl(art.value) : null;
+                      const country = art.type === "ip" ? getCountryName(art.value) : "";
+                      return (
+                        <TableRow key={art.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Icon className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-xs capitalize">{art.type}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="max-w-[300px] font-mono text-xs break-all">
+                            {art.value}
+                            {flagUrl && <img src={flagUrl} alt={country} title={country} className="ml-1 inline-block h-[13px] w-[18px] rounded-sm border border-border/50" />}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{art.description || "—"}</TableCell>
+                          <TableCell>
+                            <Badge variant={art.isMalicious ? "destructive" : "secondary"} className="text-xs">
+                              {art.isMalicious ? "Malicious" : "Benign"}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Assets */}
+          {incident.assets && incident.assets.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Assets ({incident.assets.length})</CardTitle></CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Hostname</TableHead>
+                      <TableHead>IP</TableHead>
+                      <TableHead>OS</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Owner</TableHead>
+                      <TableHead>Role</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {incident.assets.map((asset) => {
+                      const Icon = ASSET_ICON[asset.type] || Monitor;
+                      return (
+                        <TableRow key={asset.hostname}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Icon className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm font-medium">{asset.hostname}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {asset.ip}
+                            {getFlagUrl(asset.ip) && <img src={getFlagUrl(asset.ip)!} alt={getCountryName(asset.ip)} title={getCountryName(asset.ip)} className="ml-1 inline-block h-[13px] w-[18px] rounded-sm border border-border/50" />}
+                          </TableCell>
+                          <TableCell className="text-xs">{asset.os || "—"}</TableCell>
+                          <TableCell><Badge variant="outline" className="text-xs capitalize">{asset.type}</Badge></TableCell>
+                          <TableCell className="text-xs">{asset.owner || "—"}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{asset.role || "—"}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           )}

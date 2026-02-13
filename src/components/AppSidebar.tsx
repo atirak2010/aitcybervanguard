@@ -30,12 +30,14 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
-      <SidebarHeader className="border-b px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Shield className="h-6 w-6 text-primary" />
+      <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary/20 shadow-md shadow-sidebar-primary/10">
+            <Shield className="h-5 w-5 text-sidebar-primary" />
+          </div>
           <div>
-            <p className="text-sm font-bold">AIT Cyber Vanguard</p>
-            <p className="text-xs text-muted-foreground">Security Operations</p>
+            <p className="text-sm font-bold tracking-tight text-sidebar-foreground">AIT Cyber Vanguard</p>
+            <p className="text-[11px] text-sidebar-foreground/50">Security Operations</p>
           </div>
         </div>
       </SidebarHeader>
