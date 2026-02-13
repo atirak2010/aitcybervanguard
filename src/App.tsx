@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "next-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
+import { startPeriodicSync, stopPeriodicSync } from "@/services/syncEngine";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AuditProvider } from "@/contexts/AuditContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
@@ -17,7 +19,23 @@ import AuditLogPage from "@/pages/AuditLogPage";
 import SettingsPage from "@/pages/SettingsPage";
 import NotFound from "@/pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
+function SyncBootstrap({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    startPeriodicSync();
+    return () => stopPeriodicSync();
+  }, []);
+  return <>{children}</>;
+}
 
 function ProtectedRoute({ children, requiredPermission }: { children: React.ReactNode; requiredPermission?: string }) {
   const { user, hasPermission } = useAuth();
@@ -49,6 +67,7 @@ function AuthRouter() {
 const App = () => (
   <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
     <QueryClientProvider client={queryClient}>
+      <SyncBootstrap>
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -62,6 +81,7 @@ const App = () => (
         </AuditProvider>
       </AuthProvider>
       </TooltipProvider>
+      </SyncBootstrap>
     </QueryClientProvider>
   </ThemeProvider>
 );

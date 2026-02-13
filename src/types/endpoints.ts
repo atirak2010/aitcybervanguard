@@ -1,4 +1,4 @@
-export type EndpointStatus = "connected" | "disconnected" | "isolated";
+export type EndpointStatus = "connected" | "disconnected" | "isolated" | "lost" | "uninstalled";
 export type EndpointType = "workstation" | "server" | "laptop" | "virtual";
 
 export interface Endpoint {

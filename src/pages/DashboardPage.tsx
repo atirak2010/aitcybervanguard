@@ -1,7 +1,6 @@
-import { useState, useMemo, useEffect } from "react";
-import { fetchIncidents, fetchEndpoints } from "@/services/api";
-import { Incident } from "@/types/incidents";
-import { Endpoint } from "@/types/endpoints";
+import { useState, useMemo } from "react";
+import { useIncidents } from "@/hooks/useIncidents";
+import { useEndpoints } from "@/hooks/useEndpoints";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SeverityBadge } from "@/components/StatusBadges";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -23,23 +22,10 @@ const SEVERITY_COLORS = {
 type TimeFilter = "24h" | "7d" | "30d";
 
 export default function DashboardPage() {
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>("30d");
-  const [incidents, setIncidents] = useState<Incident[]>([]);
-  const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    Promise.all([fetchIncidents(), fetchEndpoints()]).then(([inc, ep]) => {
-      if (!cancelled) {
-        setIncidents(inc);
-        setEndpoints(ep);
-        setLoading(false);
-      }
-    });
-    return () => { cancelled = true; };
-  }, []);
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>("7d");
+  const { data: incidents = [], isLoading: incidentsLoading } = useIncidents();
+  const { data: endpoints = [], isLoading: endpointsLoading } = useEndpoints();
+  const loading = incidentsLoading || endpointsLoading;
 
   const filteredIncidents = useMemo(() => {
     const now = new Date();

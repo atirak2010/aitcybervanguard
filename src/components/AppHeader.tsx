@@ -9,6 +9,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { formatDateTime } from "@/lib/utils";
+import { SyncStatusIndicator } from "@/components/SyncStatusIndicator";
 
 export function AppHeader() {
   const { user, logout } = useAuth();
@@ -29,6 +30,7 @@ export function AppHeader() {
       </div>
 
       <div className="flex items-center gap-3">
+        <SyncStatusIndicator />
         {/* Notification Bell */}
         <Popover>
           <PopoverTrigger asChild>

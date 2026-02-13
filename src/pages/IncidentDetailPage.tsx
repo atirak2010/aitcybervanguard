@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { fetchIncidentById } from "@/services/api";
-import { Incident, ArtifactType } from "@/types/incidents";
+import { useIncidentById } from "@/hooks/useIncidents";
+import { ArtifactType } from "@/types/incidents";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAudit } from "@/contexts/AuditContext";
 import { SeverityBadge, StatusBadge } from "@/components/StatusBadges";
@@ -46,24 +46,10 @@ export default function IncidentDetailPage() {
   const { hasPermission } = useAuth();
   const { addAuditEntry } = useAudit();
 
-  const [incident, setIncident] = useState<Incident | undefined>(undefined);
-  const [loading, setLoading] = useState(true);
+  const { data: incident, isLoading: loading } = useIncidentById(id);
   const [actionComment, setActionComment] = useState("");
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-
-  useEffect(() => {
-    if (!id) return;
-    let cancelled = false;
-    setLoading(true);
-    fetchIncidentById(id).then((data) => {
-      if (!cancelled) {
-        setIncident(data);
-        setLoading(false);
-      }
-    });
-    return () => { cancelled = true; };
-  }, [id]);
 
   if (loading) {
     return (

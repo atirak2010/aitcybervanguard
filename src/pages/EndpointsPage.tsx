@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
-import { fetchEndpoints } from "@/services/api";
+import { useState, useMemo } from "react";
+import { useEndpoints } from "@/hooks/useEndpoints";
 import { Endpoint } from "@/types/endpoints";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAudit } from "@/contexts/AuditContext";
@@ -18,26 +18,13 @@ import { formatDate, formatDateTime, getFlagUrl, getCountryName } from "@/lib/ut
 export default function EndpointsPage() {
   const { hasPermission } = useAuth();
   const { addAuditEntry } = useAudit();
-  const [allEndpoints, setAllEndpoints] = useState<Endpoint[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: allEndpoints = [], isLoading: loading } = useEndpoints();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [osFilter, setOsFilter] = useState("all");
   const [selectedEndpoint, setSelectedEndpoint] = useState<string | null>(null);
   const [actionDialog, setActionDialog] = useState<{ type: string; target: string } | null>(null);
   const [comment, setComment] = useState("");
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    fetchEndpoints().then((data) => {
-      if (!cancelled) {
-        setAllEndpoints(data);
-        setLoading(false);
-      }
-    });
-    return () => { cancelled = true; };
-  }, []);
 
   const osList = useMemo(() => [...new Set(allEndpoints.map((e) => e.os))], [allEndpoints]);
 
@@ -89,7 +76,9 @@ export default function EndpointsPage() {
               <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="connected">Connected</SelectItem>
               <SelectItem value="disconnected">Disconnected</SelectItem>
+              <SelectItem value="lost">Connection Lost</SelectItem>
               <SelectItem value="isolated">Isolated</SelectItem>
+              <SelectItem value="uninstalled">Uninstalled</SelectItem>
             </SelectContent>
           </Select>
           <Select value={osFilter} onValueChange={setOsFilter}>

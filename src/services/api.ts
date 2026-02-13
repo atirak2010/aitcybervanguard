@@ -38,27 +38,51 @@ function mapIncidentStatus(xdrStatus: string): IncidentStatus {
   return "open";
 }
 
-function mapXdrIncident(xdr: XdrIncident): Incident {
+/**
+ * Parse XDR host entry — the API returns hosts in "hostname:ip" format.
+ * Examples: "DESKTOP-ABC:10.0.1.5", "10.200.15.228:64.227.41.39", "SRV01"
+ * Returns { name, ip } where name is the hostname and ip is the address.
+ */
+function parseHost(raw: string): { name: string; ip: string } {
+  if (!raw) return { name: "unknown", ip: "—" };
+  const colonIdx = raw.indexOf(":");
+  if (colonIdx === -1) return { name: raw, ip: raw };
+  const left = raw.slice(0, colonIdx);
+  const right = raw.slice(colonIdx + 1);
+  // If left looks like an IP and right looks like an IP → left is internal, right is external
+  // If left is a hostname and right is an IP → name=left, ip=right
+  return { name: left, ip: right || left };
+}
+
+export function mapXdrIncident(xdr: XdrIncident): Incident {
   const createdAt = new Date(xdr.creation_time);
   const date = createdAt.toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
   const time = createdAt.toLocaleTimeString("en-GB", { timeZone: "Asia/Bangkok", hour12: false });
 
-  const hosts = xdr.hosts || [];
+  const rawHosts = xdr.hosts || [];
   const users = xdr.users || [];
   const sources = xdr.incident_sources || [];
+
+  // Parse each host entry to extract hostname and IP separately
+  const parsedHosts = rawHosts.map(parseHost);
+  const sourceHost = parsedHosts[0];
+  const destHost = parsedHosts.length > 1 ? parsedHosts[1] : parsedHosts[0];
+
+  // Collect all unique hostnames for relatedEndpoints
+  const endpointNames = [...new Set(parsedHosts.map((h) => h.name))];
 
   return {
     id: `INC-${xdr.incident_id}`,
     description: xdr.description || xdr.incident_name || "Untitled Incident",
     severity: mapSeverity(xdr.severity),
     alertCount: xdr.alert_count || 0,
-    source: hosts[0] || "unknown",
-    destination: hosts.length > 1 ? hosts[1] : hosts[0] || "—",
+    source: sourceHost?.name || "unknown",
+    destination: destHost?.name || "—",
     date,
     time,
     status: mapIncidentStatus(xdr.status),
     fullDescription: xdr.manual_description || xdr.description || xdr.incident_name || "",
-    relatedEndpoints: hosts,
+    relatedEndpoints: endpointNames,
     relatedUsers: users,
     alertSources: sources,
     recommendedActions: [],
@@ -69,6 +93,8 @@ function mapEndpointStatus(xdrStatus: string): EndpointStatus {
   const s = (xdrStatus || "").toLowerCase();
   if (s === "connected") return "connected";
   if (s === "isolated") return "isolated";
+  if (s === "lost") return "lost";
+  if (s === "uninstalled") return "uninstalled";
   return "disconnected";
 }
 
@@ -80,7 +106,7 @@ function mapEndpointType(xdr: XdrEndpoint): EndpointType {
   return "workstation";
 }
 
-function mapXdrEndpoint(xdr: XdrEndpoint): Endpoint {
+export function mapXdrEndpoint(xdr: XdrEndpoint): Endpoint {
   const lastSeenDate = xdr.last_seen
     ? new Date(xdr.last_seen).toISOString()
     : new Date().toISOString();
@@ -107,8 +133,21 @@ export async function fetchIncidents(): Promise<Incident[]> {
     return [...mockIncidents];
   }
   try {
-    const result = await xdrGetIncidents([], 0, 100);
-    return result.incidents.map(mapXdrIncident);
+    // XDR API limits search_size to <100 per request — paginate in batches
+    const PAGE_SIZE = 100;
+    const MAX_PAGES = 5; // up to 500 incidents total
+    const allIncidents: Incident[] = [];
+
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const from = page * PAGE_SIZE;
+      const to = from + PAGE_SIZE;
+      const result = await xdrGetIncidents([], from, to);
+      allIncidents.push(...result.incidents.map(mapXdrIncident));
+      // Stop if we got fewer results than the page size (no more data)
+      if (result.incidents.length < PAGE_SIZE) break;
+    }
+
+    return allIncidents;
   } catch (err) {
     console.error("XDR incidents fetch failed, falling back to mock:", err);
     return [...mockIncidents];

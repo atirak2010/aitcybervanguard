@@ -1,0 +1,1 @@
+{"reply": {"err_code": 500, "err_msg": "An error occurred while processing XDR public API", "err_extra": "Invalid endpoint status '(CONNECTION_LOST)' - Choose from ['connected', 'lost', 'disconnected', 'uninstalled']"}}

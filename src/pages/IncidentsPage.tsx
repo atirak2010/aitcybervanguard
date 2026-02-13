@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
-import { fetchIncidents } from "@/services/api";
+import { useState, useMemo } from "react";
+import { useIncidents } from "@/hooks/useIncidents";
 import { useAuth } from "@/contexts/AuthContext";
 import { Incident, Severity, IncidentStatus } from "@/types/incidents";
 import { SeverityBadge, StatusBadge } from "@/components/StatusBadges";
@@ -16,8 +16,7 @@ import { getFlagUrl, getCountryName } from "@/lib/utils";
 export default function IncidentsPage() {
   const { hasPermission } = useAuth();
   const navigate = useNavigate();
-  const [incidents, setIncidents] = useState<Incident[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: incidents = [], isLoading: loading } = useIncidents();
   const [search, setSearch] = useState("");
   const [severityFilter, setSeverityFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -25,18 +24,6 @@ export default function IncidentsPage() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const perPage = 10;
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    fetchIncidents().then((data) => {
-      if (!cancelled) {
-        setIncidents(data);
-        setLoading(false);
-      }
-    });
-    return () => { cancelled = true; };
-  }, []);
 
   const filtered = useMemo(() => {
     let list = [...incidents];

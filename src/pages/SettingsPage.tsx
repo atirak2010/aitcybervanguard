@@ -13,7 +13,10 @@ import {
   type XdrIncident,
   type XdrEndpoint,
 } from "@/services/cortexXdrApi";
-import { Wifi, WifiOff, Loader2, Server, Shield, AlertTriangle, Monitor, RefreshCw } from "lucide-react";
+import { Wifi, WifiOff, Loader2, Server, Shield, AlertTriangle, Monitor, RefreshCw, Database } from "lucide-react";
+import { syncAll } from "@/services/syncEngine";
+import { useSyncStatus } from "@/hooks/useSyncStatus";
+import { db } from "@/db/csocDatabase";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -25,6 +28,9 @@ export default function SettingsPage() {
   const [loadingIncidents, setLoadingIncidents] = useState(false);
   const [xdrIncidents, setXdrIncidents] = useState<XdrIncident[] | null>(null);
   const [incidentError, setIncidentError] = useState<string | null>(null);
+
+  const { incidentSync, endpointSync } = useSyncStatus();
+  const isSyncing = incidentSync?.status === "syncing" || endpointSync?.status === "syncing";
 
   const [loadingEndpoints, setLoadingEndpoints] = useState(false);
   const [xdrEndpoints, setXdrEndpoints] = useState<XdrEndpoint[] | null>(null);
@@ -231,6 +237,68 @@ export default function SettingsPage() {
               </Table>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Local Data Cache */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Database className="h-4 w-4" /> Local Data Cache
+          </CardTitle>
+          <CardDescription>Data is synced from Cortex XDR to a local browser database for fast access</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Cached Incidents</p>
+              <p className="text-lg font-bold">{incidentSync?.syncedCount ?? 0}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Cached Endpoints</p>
+              <p className="text-lg font-bold">{endpointSync?.syncedCount ?? 0}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Last Synced</p>
+              <p className="text-sm">
+                {incidentSync?.lastSyncedAt
+                  ? new Date(incidentSync.lastSyncedAt).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })
+                  : "Never"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Status</p>
+              <Badge variant={
+                isSyncing ? "default" :
+                incidentSync?.status === "error" ? "destructive" : "secondary"
+              }>
+                {isSyncing ? "Syncing..." :
+                 incidentSync?.status === "error" ? "Error" : "Ready"}
+              </Badge>
+            </div>
+          </div>
+          {(incidentSync?.status === "error" || endpointSync?.status === "error") && (
+            <p className="text-sm text-severity-critical">
+              {incidentSync?.errorMessage || endpointSync?.errorMessage}
+            </p>
+          )}
+          <div className="flex gap-2">
+            <Button onClick={() => syncAll()} disabled={isSyncing}>
+              {isSyncing ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Syncing...</>
+              ) : (
+                <><RefreshCw className="mr-2 h-4 w-4" /> Sync Now</>
+              )}
+            </Button>
+            <Button variant="outline" onClick={async () => {
+              await db.incidents.clear();
+              await db.endpoints.clear();
+              await db.syncMeta.clear();
+              syncAll();
+            }}>
+              Clear Cache & Resync
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

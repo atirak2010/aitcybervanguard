@@ -37,17 +37,21 @@ const endpointStatusStyles: Record<EndpointStatus, string> = {
   connected: "bg-status-online/15 text-status-online",
   disconnected: "bg-status-offline/15 text-status-offline",
   isolated: "bg-severity-critical/15 text-severity-critical",
+  lost: "bg-severity-medium/15 text-severity-medium",
+  uninstalled: "bg-muted text-muted-foreground",
 };
 
 export function EndpointStatusBadge({ status }: { status: EndpointStatus }) {
   return (
     <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize", endpointStatusStyles[status])}>
-      <span className={cn("h-2 w-2 rounded-full animate-pulse", {
-        "bg-status-online shadow-sm shadow-status-online/50": status === "connected",
+      <span className={cn("h-2 w-2 rounded-full", {
+        "bg-status-online shadow-sm shadow-status-online/50 animate-pulse": status === "connected",
         "bg-status-offline": status === "disconnected",
-        "bg-severity-critical shadow-sm shadow-severity-critical/50": status === "isolated",
+        "bg-severity-critical shadow-sm shadow-severity-critical/50 animate-pulse": status === "isolated",
+        "bg-severity-medium shadow-sm shadow-severity-medium/50 animate-pulse": status === "lost",
+        "bg-muted-foreground/50": status === "uninstalled",
       })} />
-      {status}
+      {status === "lost" ? "Connection Lost" : status}
     </span>
   );
 }

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { mockIncidents } from "@/data/mock-incidents";
+import { db } from "@/db/csocDatabase";
 
 export interface CriticalAlert {
   id: string;
@@ -24,22 +24,31 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const [bannerDismissed, setBannerDismissed] = useState(false);
 
   useEffect(() => {
-    // Seed initial critical alerts from mock data
-    const criticals = mockIncidents
-      .filter((i) => i.severity === "critical" && i.status !== "closed")
-      .map((i) => ({
-        id: `NOTIF-${i.id}`,
-        incidentId: i.id,
-        description: i.description,
-        timestamp: `${i.date}T${i.time}`,
-        dismissed: false,
-      }));
-    setAlerts(criticals);
+    async function loadCriticals() {
+      try {
+        const criticals = await db.incidents
+          .where("severity")
+          .equals("critical")
+          .filter((i) => i.status !== "closed")
+          .toArray();
 
-    // Simulated polling every 30s (structure ready for WebSocket)
-    const interval = setInterval(() => {
-      // In real mode, fetch new critical incidents here
-    }, 30000);
+        setAlerts((prev) => {
+          const dismissedIds = new Set(prev.filter((a) => a.dismissed).map((a) => a.id));
+          return criticals.map((i) => ({
+            id: `NOTIF-${i.id}`,
+            incidentId: i.id,
+            description: i.description,
+            timestamp: `${i.date}T${i.time}`,
+            dismissed: dismissedIds.has(`NOTIF-${i.id}`),
+          }));
+        });
+      } catch {
+        // IndexedDB not ready yet — will retry on next interval
+      }
+    }
+
+    loadCriticals();
+    const interval = setInterval(loadCriticals, 30000);
     return () => clearInterval(interval);
   }, []);
 
