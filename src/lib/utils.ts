@@ -44,14 +44,23 @@ const IP_COUNTRY_MAP: Record<string, string> = {
   "185.220.101.1": "DE",
 };
 
-function countryCodeToFlag(code: string): string {
-  return [...code.toUpperCase()].map(
-    (c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65)
-  ).join("");
-}
-
-export function getCountryFlag(ip: string): string | null {
+export function getCountryCode(ip: string): string | null {
   if (!isIPAddress(ip) || isPrivateIP(ip)) return null;
   const code = IP_COUNTRY_MAP[ip];
-  return code ? countryCodeToFlag(code) : null;
+  return code ? code.toLowerCase() : null;
+}
+
+export function getFlagUrl(ip: string): string | null {
+  const code = getCountryCode(ip);
+  return code ? `https://flagcdn.com/20x15/${code}.png` : null;
+}
+
+const COUNTRY_NAMES: Record<string, string> = {
+  us: "United States",
+  de: "Germany",
+};
+
+export function getCountryName(ip: string): string {
+  const code = getCountryCode(ip);
+  return code ? COUNTRY_NAMES[code] || code.toUpperCase() : "";
 }
