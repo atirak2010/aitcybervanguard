@@ -20,10 +20,17 @@ export default function IncidentsPage() {
   const [search, setSearch] = useState("");
   const [severityFilter, setSeverityFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [alertSourceFilter, setAlertSourceFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<keyof Incident>("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const perPage = 10;
+
+  const alertSourceList = useMemo(() => {
+    const sources = new Set<string>();
+    incidents.forEach((i) => i.alertSources?.forEach((s) => sources.add(s)));
+    return [...sources].sort();
+  }, [incidents]);
 
   const filtered = useMemo(() => {
     let list = [...incidents];
@@ -33,13 +40,14 @@ export default function IncidentsPage() {
     }
     if (severityFilter !== "all") list = list.filter((i) => i.severity === severityFilter);
     if (statusFilter !== "all") list = list.filter((i) => i.status === statusFilter);
+    if (alertSourceFilter !== "all") list = list.filter((i) => i.alertSources?.includes(alertSourceFilter));
     list.sort((a, b) => {
       const aVal = a[sortField] ?? "";
       const bVal = b[sortField] ?? "";
       return sortDir === "asc" ? String(aVal).localeCompare(String(bVal)) : String(bVal).localeCompare(String(aVal));
     });
     return list;
-  }, [search, severityFilter, statusFilter, sortField, sortDir, incidents]);
+  }, [search, severityFilter, statusFilter, alertSourceFilter, sortField, sortDir, incidents]);
 
   const totalPages = Math.ceil(filtered.length / perPage);
   const paged = filtered.slice((page - 1) * perPage, page * perPage);
@@ -107,6 +115,15 @@ export default function IncidentsPage() {
               <SelectItem value="all">All Statuses</SelectItem>
               {(["open", "investigating", "contained", "closed"] as IncidentStatus[]).map((s) => (
                 <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={alertSourceFilter} onValueChange={(v) => { setAlertSourceFilter(v); setPage(1); }}>
+            <SelectTrigger className="w-44"><SelectValue placeholder="Alert Source" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Alert Sources</SelectItem>
+              {alertSourceList.map((s) => (
+                <SelectItem key={s} value={s}>{s}</SelectItem>
               ))}
             </SelectContent>
           </Select>

@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { AuditEntry, ActionType, AuditStatus } from "@/types/audit";
-import { mockAuditLog } from "@/data/mock-audit";
+import { db } from "@/db/csocDatabase";
 import { useAuth } from "./AuthContext";
 
 interface AuditContextType {
@@ -11,13 +11,23 @@ interface AuditContextType {
 const AuditContext = createContext<AuditContextType | null>(null);
 
 export function AuditProvider({ children }: { children: React.ReactNode }) {
-  const [auditLog, setAuditLog] = useState<AuditEntry[]>(mockAuditLog);
+  const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
   const { user } = useAuth();
+
+  // Load from IndexedDB on mount
+  useEffect(() => {
+    db.auditLog
+      .orderBy("timestamp")
+      .reverse()
+      .toArray()
+      .then(setAuditLog)
+      .catch(() => {});
+  }, []);
 
   const addAuditEntry = useCallback(
     (actionType: ActionType, target: string, status: AuditStatus, comment: string) => {
       const entry: AuditEntry = {
-        id: `AUD-${String(auditLog.length + 1).padStart(3, "0")}`,
+        id: `AUD-${Date.now()}`,
         timestamp: new Date().toISOString(),
         user: user?.name ?? "Unknown",
         role: user?.role ?? "unknown",
@@ -27,8 +37,9 @@ export function AuditProvider({ children }: { children: React.ReactNode }) {
         comment,
       };
       setAuditLog((prev) => [entry, ...prev]);
+      db.auditLog.put(entry).catch(() => {});
     },
-    [auditLog.length, user]
+    [user]
   );
 
   return (

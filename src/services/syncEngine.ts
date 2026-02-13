@@ -8,7 +8,7 @@ import {
 } from "@/services/cortexXdrApi";
 
 const PAGE_SIZE = 100;
-const INCIDENT_MAX_PAGES = 50; // up to 5000 incidents per sync
+const INCIDENT_MAX_PAGES = 20; // up to 2000 incidents per sync
 const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 // --- Pub/sub for sync status ---
